@@ -1,15 +1,34 @@
 require('dotenv').config();
 
+function readEnv(name, { aliases = [], defaultValue, required = false, transform = (value) => value } = {}) {
+  for (const key of [name, ...aliases]) {
+    const value = process.env[key];
+    if (value !== undefined && String(value).trim() !== '') {
+      return transform(String(value).trim());
+    }
+  }
+
+  if (defaultValue !== undefined) {
+    return transform(defaultValue);
+  }
+
+  if (required) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return undefined;
+}
+
 module.exports = {
-  JWT_SECRET: process.env.JWT_SECRET || 'supersecret',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '12h',
-  JWT_REFRESH_EXPIRES_DAYS: Number(process.env.JWT_REFRESH_EXPIRES_DAYS || 14),
-  JWT_ISSUER: process.env.JWT_ISSUER || 'quran-elearning-api',
-  JWT_AUDIENCE: process.env.JWT_AUDIENCE || 'quran-elearning-client',
-  JWT_REFRESH_AUDIENCE: process.env.JWT_REFRESH_AUDIENCE || 'quran-elearning-refresh',
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
-  OTP_EXPIRES_MINUTES: Number(process.env.OTP_EXPIRES_MINUTES || 10),
-  OTP_MAX_ATTEMPTS: Number(process.env.OTP_MAX_ATTEMPTS || 5),
-  OTP_MIN_INTERVAL_SECONDS: Number(process.env.OTP_MIN_INTERVAL_SECONDS || 60),
-  DB_URL: process.env.DB_URL || '',
+  JWT_SECRET: readEnv('JWT_SECRET', { required: true }),
+  JWT_EXPIRES_IN: readEnv('JWT_EXPIRES_IN', { defaultValue: '12h' }),
+  JWT_REFRESH_EXPIRES_DAYS: readEnv('JWT_REFRESH_EXPIRES_DAYS', { defaultValue: 14, transform: Number }),
+  JWT_ISSUER: readEnv('JWT_ISSUER', { defaultValue: 'quran-elearning-api' }),
+  JWT_AUDIENCE: readEnv('JWT_AUDIENCE', { defaultValue: 'quran-elearning-client' }),
+  JWT_REFRESH_AUDIENCE: readEnv('JWT_REFRESH_AUDIENCE', { defaultValue: 'quran-elearning-refresh' }),
+  GOOGLE_CLIENT_ID: readEnv('GOOGLE_CLIENT_ID', { defaultValue: '' }),
+  OTP_EXPIRES_MINUTES: readEnv('OTP_EXPIRES_MINUTES', { defaultValue: 10, transform: Number }),
+  OTP_MAX_ATTEMPTS: readEnv('OTP_MAX_ATTEMPTS', { defaultValue: 5, transform: Number }),
+  OTP_MIN_INTERVAL_SECONDS: readEnv('OTP_MIN_INTERVAL_SECONDS', { defaultValue: 60, transform: Number }),
+  DB_URL: readEnv('DATABASE_URL', { aliases: ['DB_URL'], required: true }),
 };
