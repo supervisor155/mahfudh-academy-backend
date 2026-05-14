@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "Auth OTP Google Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Smoke flow: owner login, OTP registration, role promotion, optional Google auth"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "ownerEmail", "value": "owner@example.com" },
+    { "key": "ownerPassword", "value": "replace_me" },
+    { "key": "otpEmail", "value": "otp-user@example.com" },
+    { "key": "otpPassword", "value": "ChangeMe123!" },
+    { "key": "googleIdToken", "value": "" },
+    { "key": "otpCode", "value": "" },
+    { "key": "ownerAccessToken", "value": "" },
+    { "key": "ownerRefreshToken", "value": "" },
+    { "key": "registrationVerificationToken", "value": "" },
+    { "key": "registeredUserId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "Owner Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('ownerAccessToken', json.token || '');",
+              "pm.collectionVariables.set('ownerRefreshToken', json.refresh_token || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Request Registration OTP (Email)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"email\",\n  \"email\": \"{{otpEmail}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register/request-otp", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register", "request-otp"] }
+      }
+    },
+    {
+      "name": "Verify Registration OTP (Email)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"email\",\n  \"email\": \"{{otpEmail}}\",\n  \"code\": \"{{otpCode}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register/verify-otp", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register", "verify-otp"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('registrationVerificationToken', json.registration_verification_token || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register Teacher (OTP Verified)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{otpEmail}}\",\n  \"password\": \"{{otpPassword}}\",\n  \"name\": \"OTP Smoke Teacher\",\n  \"role\": \"teacher\",\n  \"registration_verification_token\": \"{{registrationVerificationToken}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('registeredUserId', json.user?.id || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Promote Teacher to Manager (Owner)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{ownerAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"role\": \"manager\",\n  \"owner_password\": \"{{ownerPassword}}\",\n  \"reason\": \"Postman smoke manager promotion\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/users/{{registeredUserId}}/role", "host": ["{{baseUrl}}"], "path": ["api", "auth", "users", "{{registeredUserId}}", "role"] }
+      }
+    },
+    {
+      "name": "Google Auth (Optional)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id_token\": \"{{googleIdToken}}\",\n  \"role\": \"student\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "google"] }
+      }
+    }
+  ]
+}

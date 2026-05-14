@@ -1,0 +1,42 @@
+{
+  "name": "quran-elearning-backend",
+  "version": "1.0.0",
+  "description": "Production backend for Mahfudh Academy Islamic Learning Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "start:staging": "node scripts/start-staging.js",
+    "start:prod": "node scripts/start-prod.js",
+    "smoke:test": "node scripts/smoke-tests.js",
+    "db:backup": "powershell -ExecutionPolicy Bypass -File scripts/backup-db.ps1",
+    "db:restore": "powershell -ExecutionPolicy Bypass -File scripts/restore-db.ps1"
+  },
+  "dependencies": {
+    "axios": "^1.16.0",
+    "bcrypt": "^5.1.1",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.5.1",
+    "google-auth-library": "^10.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "network-speed": "^2.1.1",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.20.0",
+    "pino": "^9.14.0",
+    "pino-http": "^10.5.0",
+    "socket.io": "^4.7.5",
+    "socket.io-msgpack-parser": "^3.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
