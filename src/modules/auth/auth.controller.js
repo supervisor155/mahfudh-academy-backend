@@ -212,20 +212,20 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'Email or phone is required' });
     }
 
-    if (!registration_verification_token) {
-      return res.status(400).json({ message: 'registration_verification_token is required' });
-    }
+    // Temporary: allow direct registration without OTP verification token.
+    // If a token is provided, still validate it to remain compatible.
+    if (registration_verification_token) {
+      let verified;
+      try {
+        verified = verifyRegistrationVerificationToken(String(registration_verification_token));
+      } catch {
+        return res.status(401).json({ message: 'Invalid or expired registration verification token' });
+      }
 
-    let verified;
-    try {
-      verified = verifyRegistrationVerificationToken(String(registration_verification_token));
-    } catch {
-      return res.status(401).json({ message: 'Invalid or expired registration verification token' });
-    }
-
-    const expectedTarget = verified.channel === 'phone' ? normalizedPhone : normalizedEmail;
-    if (!expectedTarget || verified.target !== expectedTarget) {
-      return res.status(401).json({ message: 'Verification token does not match account identifier' });
+      const expectedTarget = verified.channel === 'phone' ? normalizedPhone : normalizedEmail;
+      if (!expectedTarget || verified.target !== expectedTarget) {
+        return res.status(401).json({ message: 'Verification token does not match account identifier' });
+      }
     }
 
     const safeEmail = normalizedEmail || `phone-${normalizedPhone.replace(/\D/g, '')}@phone.local`;
