@@ -47,12 +47,21 @@ let last5xxAlertAt = 0;
 const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+const allowedOriginSet = new Set(allowedOrigins);
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  return allowedOriginSet.has(origin);
+}
 
 // Socket.io with MessagePack binary parser
 const io = new Server(server, {
   parser: msgpackParser,
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -70,7 +79,10 @@ setIo(io);
 
 // CORS middleware
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
