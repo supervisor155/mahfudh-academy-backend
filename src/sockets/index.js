@@ -19,6 +19,8 @@ module.exports = (io) => {
   mushafHandler(io);
 
   io.on('connection', (socket) => {
+    // Always join a stable per-user room for targeted emits (DM, signaling, notifications).
+    socket.join(`user:${socket.user.id}`);
     attachSocketTrafficGuard(socket);
     bandwidthHandler(io, socket);
   });

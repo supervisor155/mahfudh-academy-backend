@@ -23,7 +23,13 @@ module.exports = async (socket, next) => {
     if (Number(decoded.sv || 0) !== Number(current.session_version || 0)) {
       return next(new Error('Session expired'));
     }
-    socket.user = decoded;
+    socket.user = {
+      id: current.id,
+      name: current.name,
+      role: current.role,
+      session_version: current.session_version,
+      sv: decoded.sv,
+    };
     next();
   } catch {
     next(new Error('Invalid token'));

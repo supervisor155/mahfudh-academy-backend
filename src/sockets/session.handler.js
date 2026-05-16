@@ -188,9 +188,19 @@ module.exports = (io) => {
         signal.sdp = _injectLowBandwidthHints(signal.sdp);
       }
 
-      io.to(`user:${to_user_id}`).emit('session:signal', {
+      const targetUserId = Number(to_user_id);
+      io.to(`user:${targetUserId}`).emit('session:signal', {
         session_id,
         from_user_id: socket.user.id,
+        to_user_id: targetUserId,
+        signal,
+      });
+
+      // Fallback for legacy sockets not joined to user room; receiver filters by to_user_id.
+      socket.to(`session:${session_id}`).emit('session:signal', {
+        session_id,
+        from_user_id: socket.user.id,
+        to_user_id: targetUserId,
         signal,
       });
     });
