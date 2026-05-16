@@ -1,5 +1,9 @@
 const db = require('../../db');
 
+function isMissingRelationError(err, tableName) {
+  return err?.code === '42P01' && String(err?.message || '').includes(`"${tableName}"`);
+}
+
 exports.uploadReel = async ({ class_id, title, url, uploaded_by }) => {
   const { rows } = await db.query(
     `INSERT INTO reels (class_id, title, url, uploaded_by) VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -9,14 +13,26 @@ exports.uploadReel = async ({ class_id, title, url, uploaded_by }) => {
 };
 
 exports.getReelsByClass = async (class_id, limit = 20, offset = 0) => {
-  const { rows } = await db.query(
-    `SELECT r.*, u.name as uploader_name,
-            (SELECT COUNT(*) FROM reel_likes rl WHERE rl.reel_id = r.id) AS like_count
-     FROM reels r JOIN users u ON r.uploaded_by = u.id
-     WHERE r.class_id = $1 AND r.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
-    [class_id, limit, offset]
-  );
-  return rows;
+  try {
+    const { rows } = await db.query(
+      `SELECT r.*, u.name as uploader_name,
+              (SELECT COUNT(*) FROM reel_likes rl WHERE rl.reel_id = r.id) AS like_count
+       FROM reels r JOIN users u ON r.uploaded_by = u.id
+       WHERE r.class_id = $1 AND r.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
+      [class_id, limit, offset]
+    );
+    return rows;
+  } catch (err) {
+    if (!isMissingRelationError(err, 'reel_likes')) throw err;
+
+    const { rows } = await db.query(
+      `SELECT r.*, u.name as uploader_name, 0::bigint AS like_count
+       FROM reels r JOIN users u ON r.uploaded_by = u.id
+       WHERE r.class_id = $1 AND r.deleted_at IS NULL ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
+      [class_id, limit, offset]
+    );
+    return rows;
+  }
 };
 
 /**
@@ -25,27 +41,53 @@ exports.getReelsByClass = async (class_id, limit = 20, offset = 0) => {
  *   - private classes where the requesting user is a member
  */
 exports.getGlobalFeed = async (user_id, limit = 15, offset = 0) => {
-  const { rows } = await db.query(
-    `SELECT r.*, u.name AS uploader_name, c.name AS class_name, c.is_private,
-            (SELECT COUNT(*) FROM reel_likes rl WHERE rl.reel_id = r.id) AS like_count,
-            EXISTS (SELECT 1 FROM reel_likes rl WHERE rl.reel_id = r.id AND rl.user_id = $1) AS liked_by_me
-     FROM reels r
-     JOIN users u   ON r.uploaded_by = u.id
-     JOIN classes c ON r.class_id = c.id
-     WHERE r.deleted_at IS NULL
-       AND c.deleted_at IS NULL
-       AND (
-         COALESCE(c.is_private, FALSE) = FALSE
-         OR EXISTS (
-           SELECT 1 FROM class_members cm
-           WHERE cm.class_id = r.class_id AND cm.user_id = $1
+  try {
+    const { rows } = await db.query(
+      `SELECT r.*, u.name AS uploader_name, c.name AS class_name, c.is_private,
+              (SELECT COUNT(*) FROM reel_likes rl WHERE rl.reel_id = r.id) AS like_count,
+              EXISTS (SELECT 1 FROM reel_likes rl WHERE rl.reel_id = r.id AND rl.user_id = $1) AS liked_by_me
+       FROM reels r
+       JOIN users u   ON r.uploaded_by = u.id
+       JOIN classes c ON r.class_id = c.id
+       WHERE r.deleted_at IS NULL
+         AND c.deleted_at IS NULL
+         AND (
+           COALESCE(c.is_private, FALSE) = FALSE
+           OR EXISTS (
+             SELECT 1 FROM class_members cm
+             WHERE cm.class_id = r.class_id AND cm.user_id = $1
+           )
          )
-       )
-     ORDER BY r.created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [user_id, limit, offset]
-  );
-  return rows;
+       ORDER BY r.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [user_id, limit, offset]
+    );
+    return rows;
+  } catch (err) {
+    if (!isMissingRelationError(err, 'reel_likes')) throw err;
+
+    const { rows } = await db.query(
+      `SELECT r.*, u.name AS uploader_name, c.name AS class_name, c.is_private,
+              0::bigint AS like_count,
+              FALSE AS liked_by_me
+       FROM reels r
+       JOIN users u   ON r.uploaded_by = u.id
+       JOIN classes c ON r.class_id = c.id
+       WHERE r.deleted_at IS NULL
+         AND c.deleted_at IS NULL
+         AND (
+           COALESCE(c.is_private, FALSE) = FALSE
+           OR EXISTS (
+             SELECT 1 FROM class_members cm
+             WHERE cm.class_id = r.class_id AND cm.user_id = $1
+           )
+         )
+       ORDER BY r.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [user_id, limit, offset]
+    );
+    return rows;
+  }
 };
 
 exports.getReelById = async (reel_id) => {
@@ -79,33 +121,48 @@ exports.getViewCount = async (reel_id) => {
 };
 
 exports.likeReel = async (reel_id, user_id) => {
-  await db.query(
-    `INSERT INTO reel_likes (reel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-    [reel_id, user_id]
-  );
-  const { rows } = await db.query(
-    'SELECT COUNT(*) AS count FROM reel_likes WHERE reel_id = $1',
-    [reel_id]
-  );
-  return parseInt(rows[0].count, 10);
+  try {
+    await db.query(
+      `INSERT INTO reel_likes (reel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [reel_id, user_id]
+    );
+    const { rows } = await db.query(
+      'SELECT COUNT(*) AS count FROM reel_likes WHERE reel_id = $1',
+      [reel_id]
+    );
+    return parseInt(rows[0].count, 10);
+  } catch (err) {
+    if (!isMissingRelationError(err, 'reel_likes')) throw err;
+    return 0;
+  }
 };
 
 exports.unlikeReel = async (reel_id, user_id) => {
-  await db.query(
-    'DELETE FROM reel_likes WHERE reel_id = $1 AND user_id = $2',
-    [reel_id, user_id]
-  );
-  const { rows } = await db.query(
-    'SELECT COUNT(*) AS count FROM reel_likes WHERE reel_id = $1',
-    [reel_id]
-  );
-  return parseInt(rows[0].count, 10);
+  try {
+    await db.query(
+      'DELETE FROM reel_likes WHERE reel_id = $1 AND user_id = $2',
+      [reel_id, user_id]
+    );
+    const { rows } = await db.query(
+      'SELECT COUNT(*) AS count FROM reel_likes WHERE reel_id = $1',
+      [reel_id]
+    );
+    return parseInt(rows[0].count, 10);
+  } catch (err) {
+    if (!isMissingRelationError(err, 'reel_likes')) throw err;
+    return 0;
+  }
 };
 
 exports.getLikeStatus = async (reel_id, user_id) => {
-  const { rows } = await db.query(
-    'SELECT 1 FROM reel_likes WHERE reel_id = $1 AND user_id = $2',
-    [reel_id, user_id]
-  );
-  return rows.length > 0;
+  try {
+    const { rows } = await db.query(
+      'SELECT 1 FROM reel_likes WHERE reel_id = $1 AND user_id = $2',
+      [reel_id, user_id]
+    );
+    return rows.length > 0;
+  } catch (err) {
+    if (!isMissingRelationError(err, 'reel_likes')) throw err;
+    return false;
+  }
 };
