@@ -18,7 +18,7 @@ const db = require('../db');
 const { getActiveChatRestriction } = require('../modules/security/security.service');
 const { logger } = require('../utils/logger');
 
-// In-memory presence store: session_id -> Set<user_id>
+// In-memory presence store: session_id -> Map<user_id, user>
 const presence = new Map();
 // In-memory session-chat presence: session_id -> Map<user_id, { user, count }>
 const chatPresence = new Map();
@@ -66,12 +66,25 @@ module.exports = (io) => {
     socket.on('session:join', ({ session_id }) => {
       if (!session_id) return;
       socket.join(`session:${session_id}`);
-      if (!presence.has(session_id)) presence.set(session_id, new Set());
-      presence.get(session_id).add(socket.user.id);
+      if (!presence.has(session_id)) presence.set(session_id, new Map());
+
+      const room = presence.get(session_id);
+      const participants = Array.from(room.values());
+
+      socket.emit('session:participants', {
+        session_id,
+        participants,
+      });
+
+      room.set(socket.user.id, {
+        id: socket.user.id,
+        name: socket.user.name,
+        role: socket.user.role,
+      });
 
       io.to(`session:${session_id}`).emit('session:user_joined', {
         user: { id: socket.user.id, name: socket.user.name, role: socket.user.role },
-        participants_count: presence.get(session_id).size,
+        participants_count: room.size,
       });
     });
 
@@ -175,7 +188,8 @@ module.exports = (io) => {
         signal.sdp = _injectLowBandwidthHints(signal.sdp);
       }
 
-      socket.to(`session:${session_id}`).emit('session:signal', {
+      io.to(`user:${to_user_id}`).emit('session:signal', {
+        session_id,
         from_user_id: socket.user.id,
         signal,
       });
@@ -207,10 +221,10 @@ function _injectLowBandwidthHints(sdp) {
 
 function _handleLeave(io, socket, session_id) {
   socket.leave(`session:${session_id}`);
-  const members = presence.get(session_id);
-  if (members) {
-    members.delete(socket.user.id);
-    if (members.size === 0) presence.delete(session_id);
+  const room = presence.get(session_id);
+  if (room) {
+    room.delete(socket.user.id);
+    if (room.size === 0) presence.delete(session_id);
   }
   io.to(`session:${session_id}`).emit('session:user_left', {
     user_id: socket.user.id,
