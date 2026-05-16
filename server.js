@@ -44,10 +44,18 @@ const BOOTED_AT = Date.now();
 const recent5xx = [];
 let last5xxAlertAt = 0;
 
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+
 // Socket.io with MessagePack binary parser
 const io = new Server(server, {
   parser: msgpackParser,
-  cors: { origin: process.env.CLIENT_ORIGIN || '*', methods: ['GET', 'POST'] },
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
   transports: ['websocket', 'polling'],
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
@@ -62,9 +70,7 @@ setIo(io);
 
 // CORS middleware
 const corsOptions = {
-  origin: process.env.CLIENT_ORIGIN 
-    ? process.env.CLIENT_ORIGIN.split(',').map(o => o.trim())
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
