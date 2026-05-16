@@ -20,6 +20,7 @@
  */
 const db = require('../db');
 const { getActiveChatRestriction } = require('../modules/security/security.service');
+const { logger } = require('../utils/logger');
 
 // class_id -> Map<user_id, { user, count }>
 const classPresence = new Map();
@@ -119,7 +120,9 @@ module.exports = (io) => {
           message: text,
           sent_at: rows[0].created_at,
         });
-      } catch {
+      } catch (err) {
+        logger.error({ err, classId, userId: socket.user.id }, 'Failed to send class chat message');
+        socket.emit('chat:error', { message: 'Failed to send class chat message' });
         // Ignore transient DB failures and keep socket alive.
       }
     });
@@ -158,7 +161,8 @@ module.exports = (io) => {
            WHERE to_user = $1 AND from_user = $2 AND is_read = FALSE`,
           [socket.user.id, pid]
         );
-      } catch {
+      } catch (err) {
+        logger.error({ err, peerId: pid, userId: socket.user.id }, 'Failed to load DM history');
         socket.emit('chat:dm:history', { peer_id: pid, messages: [] });
       }
     });
@@ -201,7 +205,9 @@ module.exports = (io) => {
 
         io.to(`user:${socket.user.id}`).emit('chat:dm:message', payload);
         io.to(`user:${target}`).emit('chat:dm:message', payload);
-      } catch {
+      } catch (err) {
+        logger.error({ err, target, userId: socket.user.id }, 'Failed to send DM message');
+        socket.emit('chat:dm:error', { message: 'Failed to send direct message' });
         // Ignore transient DB failures and keep socket alive.
       }
     });

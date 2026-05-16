@@ -16,6 +16,7 @@
  */
 const db = require('../db');
 const { getActiveChatRestriction } = require('../modules/security/security.service');
+const { logger } = require('../utils/logger');
 
 // In-memory presence store: session_id -> Set<user_id>
 const presence = new Map();
@@ -133,26 +134,30 @@ module.exports = (io) => {
         return;
       }
 
-      const isLive = await _isSessionLive(session_id);
-      if (!isLive) {
-        socket.emit('session:chat:closed', { session_id });
-        return;
+      try {
+        const isLive = await _isSessionLive(session_id);
+        if (!isLive) {
+          socket.emit('session:chat:closed', { session_id });
+          return;
+        }
+
+        const payload = {
+          session_id,
+          from: { id: socket.user.id, name: socket.user.name, role: socket.user.role },
+          message: text,
+          sent_at: new Date().toISOString(),
+        };
+
+        const key = String(session_id);
+        const history = sessionChatHistory.get(key) || [];
+        history.push(payload);
+        sessionChatHistory.set(key, history.slice(-100));
+
+        io.to(`session:${session_id}`).emit('session:chat:message', payload);
+      } catch (err) {
+        logger.error({ err, sessionId: session_id, userId: socket.user.id }, 'Failed to send live session chat message');
+        socket.emit('session:chat:error', { message: 'Failed to send live session chat message' });
       }
-
-      const payload = {
-        session_id,
-        from: { id: socket.user.id, name: socket.user.name, role: socket.user.role },
-        message: text,
-        sent_at: new Date().toISOString(),
-      };
-
-      const key = String(session_id);
-      const history = sessionChatHistory.get(key) || [];
-      history.push(payload);
-      // Keep only latest 100 temporary messages per live session.
-      sessionChatHistory.set(key, history.slice(-100));
-
-      io.to(`session:${session_id}`).emit('session:chat:message', payload);
     });
 
     socket.on('session:chat:clear', ({ session_id }) => {
