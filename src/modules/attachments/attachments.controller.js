@@ -10,7 +10,7 @@ exports.uploadAttachment = [
       const { class_id } = req.body;
       if (!class_id) return res.status(400).json({ message: 'class_id required' });
 
-      const url = getPublicUrl(req.file.filename);
+      const url = getPublicUrl(req.file.filename, req);
       const attachment = await attachmentsService.createAttachment({
         class_id,
         uploaded_by: req.user.id,

@@ -50,7 +50,7 @@ exports.submit = [
       if (!assignment_id) return res.status(400).json({ message: 'assignment_id required' });
       let file_url = null, filename = null;
       if (req.file) {
-        file_url = getPublicUrl(req.file.filename);
+        file_url = getPublicUrl(req.file.filename, req);
         filename = req.file.filename;
       }
       if (!content && !file_url) return res.status(400).json({ message: 'Provide content text or a file' });

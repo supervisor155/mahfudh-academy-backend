@@ -44,11 +44,21 @@ exports.upload = multer({
   },
 });
 
+function getRequestBaseUrl(req) {
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
+  const forwardedHost = String(req?.headers?.['x-forwarded-host'] || '').split(',')[0].trim();
+  const host = forwardedHost || req?.get?.('host') || req?.headers?.host;
+  const proto = forwardedProto || req?.protocol;
+
+  if (!host) return null;
+  return `${proto || 'http'}://${host}`;
+}
+
 // ── PUBLIC URL ───────────────────────────────────────────────
-exports.getPublicUrl = (filename) => {
+exports.getPublicUrl = (filename, req) => {
   // TODO (Supabase): return supabase.storage.from('quran-assets').getPublicUrl(filename).data.publicUrl
-  const base = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
-  return `${base}/uploads/${filename}`;
+  const base = getRequestBaseUrl(req) || process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+  return `${String(base).replace(/\/$/, '')}/uploads/${filename}`;
 };
 
 // ── DELETE FILE ──────────────────────────────────────────────

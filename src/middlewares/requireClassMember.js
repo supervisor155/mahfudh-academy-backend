@@ -1,25 +1,55 @@
 /**
  * requireClassMember middleware
  *
- * Verifies that the authenticated user is a member of the class referenced
- * in the request. The class ID is resolved in this priority order:
- *   1. req.params.classId (explicit route param)
- *   2. req.params.id      (e.g. /classes/:id routes)
- *   3. req.query.class_id  (GET with query string)
- *   4. req.body.class_id   (POST body)
- *
- * Teachers/owners/managers can always access any class they're a member of.
- * Responds 403 if the user is not a member.
+ * Verifies that the authenticated user belongs to the class implied by the
+ * request. Some routers use `:id` for a class-owned resource like a video or
+ * reel, so we must resolve that resource's owning class before checking
+ * membership instead of assuming every `:id` is a class id.
  */
 const db = require('../db');
 
+const RESOURCE_CLASS_LOOKUPS = {
+  '/api/announcements': {
+    query: 'SELECT class_id FROM announcements WHERE id = $1 LIMIT 1',
+  },
+  '/api/assignments': {
+    query: 'SELECT class_id FROM assignments WHERE id = $1 LIMIT 1',
+  },
+  '/api/attachments': {
+    query: 'SELECT class_id FROM attachments WHERE id = $1 LIMIT 1',
+  },
+  '/api/curriculum': {
+    query: 'SELECT class_id FROM modules WHERE id = $1 LIMIT 1',
+  },
+  '/api/reels': {
+    query: 'SELECT class_id FROM reels WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+  },
+  '/api/sessions': {
+    query: 'SELECT class_id FROM live_sessions WHERE id = $1 LIMIT 1',
+  },
+  '/api/videos': {
+    query: 'SELECT class_id FROM videos WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+  },
+};
+
+async function resolveClassId(req) {
+  if (req.params.classId) return req.params.classId;
+  if (req.query.class_id) return req.query.class_id;
+  if (req.body?.class_id) return req.body.class_id;
+
+  const resourceId = req.params.id;
+  if (!resourceId) return null;
+
+  const lookup = RESOURCE_CLASS_LOOKUPS[req.baseUrl];
+  if (!lookup) return null;
+
+  const { rows } = await db.query(lookup.query, [resourceId]);
+  return rows[0]?.class_id || null;
+}
+
 module.exports = async (req, res, next) => {
   try {
-    const classId =
-      req.params.classId ||
-      req.params.id ||
-      req.query.class_id ||
-      req.body?.class_id;
+    const classId = await resolveClassId(req);
 
     if (!classId) return next(); // no class context — let route handler decide
 

@@ -9,7 +9,7 @@ exports.uploadReel = [
       const { class_id, title, url: bodyUrl } = req.body;
       if (!class_id) return res.status(400).json({ message: 'class_id required' });
       let url = bodyUrl;
-      if (req.file) url = getPublicUrl(req.file.filename);
+      if (req.file) url = getPublicUrl(req.file.filename, req);
       if (!url) return res.status(400).json({ message: 'Provide a video file or a url' });
       const cls = await classesService.getClassById(class_id);
       if (!cls) return res.status(404).json({ message: 'Class not found' });
