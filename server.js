@@ -8,7 +8,6 @@ const cookieParser     = require('cookie-parser');
 const http             = require('http');
 const path             = require('path');
 const { Server }       = require('socket.io');
-const msgpackParser    = require('socket.io-msgpack-parser');
 const { setIo }        = require('./src/utils/realtime');
 const { logger, httpLogger } = require('./src/utils/logger');
 const db               = require('./src/db');
@@ -54,9 +53,7 @@ function isOriginAllowed(origin) {
   return allowedOriginSet.has(origin);
 }
 
-// Socket.io with MessagePack binary parser
 const io = new Server(server, {
-  parser: msgpackParser,
   cors: {
     origin: (origin, callback) => {
       if (isOriginAllowed(origin)) return callback(null, true);
@@ -65,7 +62,7 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
     skipMiddlewares: true,
