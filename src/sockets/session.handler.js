@@ -179,25 +179,16 @@ module.exports = (io) => {
       _clearSessionChat(io, session_id);
     });
 
-    // SFU signaling relay (offer/answer/ICE) with FEC support hints
+    // SFU signaling relay (offer/answer/ICE)
     socket.on('session:signal', ({ session_id, to_user_id, signal }) => {
       if (!session_id || !to_user_id || !signal) return;
-      
-      // Inject Low-Bandwidth FEC (Forward Error Correction) hints if signal is SDP
+
       if (signal.type === 'offer' || signal.type === 'answer') {
         signal.sdp = _injectLowBandwidthHints(signal.sdp);
       }
 
       const targetUserId = Number(to_user_id);
       io.to(`user:${targetUserId}`).emit('session:signal', {
-        session_id,
-        from_user_id: socket.user.id,
-        to_user_id: targetUserId,
-        signal,
-      });
-
-      // Fallback for legacy sockets not joined to user room; receiver filters by to_user_id.
-      socket.to(`session:${session_id}`).emit('session:signal', {
         session_id,
         from_user_id: socket.user.id,
         to_user_id: targetUserId,
