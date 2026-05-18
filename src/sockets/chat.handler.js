@@ -219,6 +219,55 @@ module.exports = (io) => {
       });
     });
 
+    // ─── DM Call Signaling ────────────────────────────────────────────────────
+
+    socket.on('dm:call:request', ({ to_user_id, call_id, call_type }) => {
+      const target = Number(to_user_id);
+      if (!target || target === socket.user.id || !call_id) return;
+      io.to(`user:${target}`).emit('dm:call:incoming', {
+        call_id,
+        from: { id: socket.user.id, name: socket.user.name, role: socket.user.role },
+        call_type: call_type === 'video' ? 'video' : 'audio',
+      });
+    });
+
+    socket.on('dm:call:accept', ({ call_id, to_user_id }) => {
+      const target = Number(to_user_id);
+      if (!target || !call_id) return;
+      io.to(`user:${target}`).emit('dm:call:accepted', {
+        call_id,
+        from: { id: socket.user.id, name: socket.user.name },
+      });
+    });
+
+    socket.on('dm:call:reject', ({ call_id, to_user_id }) => {
+      const target = Number(to_user_id);
+      if (!target || !call_id) return;
+      io.to(`user:${target}`).emit('dm:call:rejected', { call_id });
+    });
+
+    socket.on('dm:call:cancel', ({ call_id, to_user_id }) => {
+      const target = Number(to_user_id);
+      if (!target || !call_id) return;
+      io.to(`user:${target}`).emit('dm:call:cancelled', { call_id });
+    });
+
+    socket.on('dm:call:end', ({ call_id, to_user_id }) => {
+      const target = Number(to_user_id);
+      if (!target || !call_id) return;
+      io.to(`user:${target}`).emit('dm:call:ended', { call_id });
+    });
+
+    socket.on('dm:call:signal', ({ call_id, to_user_id, signal }) => {
+      const target = Number(to_user_id);
+      if (!target || !call_id || !signal) return;
+      io.to(`user:${target}`).emit('dm:call:signal', {
+        call_id,
+        from_user_id: socket.user.id,
+        signal,
+      });
+    });
+
     socket.on('disconnecting', () => {
       socket.data.chatClasses?.forEach((class_id) => {
         _decrementPresence(io, class_id, socket.user.id);
