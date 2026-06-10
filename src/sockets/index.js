@@ -5,6 +5,7 @@ const sessionHandler = require('./session.handler');
 const notificationsHandler = require('./notifications.handler');
 const noteSyncHandler = require('./noteSync.handler');
 const mushafHandler = require('./mushaf.handler');
+const presenceHandler = require('./presence.handler');
 const { bandwidthHandler } = require('../utils/bandwidth');
 const attachSocketTrafficGuard = require('./trafficGuard');
 
@@ -17,6 +18,7 @@ module.exports = (io) => {
   notificationsHandler(io);
   noteSyncHandler(io);
   mushafHandler(io);
+  presenceHandler(io);
 
   io.on('connection', (socket) => {
     // Always join a stable per-user room for targeted emits (DM, signaling, notifications).
