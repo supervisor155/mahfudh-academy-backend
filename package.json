@@ -13,6 +13,7 @@
     "db:restore": "powershell -ExecutionPolicy Bypass -File scripts/restore-db.ps1"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "axios": "^1.16.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.8.1",

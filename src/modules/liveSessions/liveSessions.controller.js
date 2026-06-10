@@ -3,6 +3,7 @@ const db = require('../../db');
 const notificationsService = require('../notifications/notifications.service');
 const { getIo } = require('../../utils/realtime');
 const sessionSocketHandler = require('../../sockets/session.handler');
+const webrtcConfig = require('../../config/webrtc');
 
 exports.createSession = async (req, res) => {
   try {
@@ -121,10 +122,11 @@ exports.joinSession = async (req, res) => {
     await sessionsService.joinSession(req.params.id, req.user.id);
 
     // Client connects via Socket.io room `session:{id}` — no external token needed
-    res.json({ 
+    res.json({
       message: 'Joined session',
       room_id: session.metadata?.room_id || `room-${session.id}`,
       session_id: session.id,
+      ice_servers: webrtcConfig.iceServers, // Send STUN/TURN config to frontend
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

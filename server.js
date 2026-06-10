@@ -43,14 +43,29 @@ const BOOTED_AT = Date.now();
 const recent5xx = [];
 let last5xxAlertAt = 0;
 
+// Parse allowed origins from environment or use defaults for development
 const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+
 const allowedOriginSet = new Set(allowedOrigins);
 
+// Log allowed origins on startup for debugging
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
+
 function isOriginAllowed(origin) {
+  // Allow requests with no origin (like mobile apps, Postman, curl)
   if (!origin) return true;
-  return allowedOriginSet.has(origin);
+
+  // Check exact match
+  if (allowedOriginSet.has(origin)) return true;
+
+  // In production, log rejected origins for debugging
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('⚠️  Rejected CORS origin:', origin);
+  }
+
+  return false;
 }
 
 const io = new Server(server, {
@@ -195,11 +210,28 @@ app.use(csrfProtection);
 
 app.get('/health', async (_req, res) => {
   const uptime_s = Math.floor((Date.now() - BOOTED_AT) / 1000);
+  const { USE_SUPABASE } = require('./src/utils/storage');
+
   try {
     await db.query('SELECT 1');
-    return res.json({ status: 'ok', uptime_s, db: 'ok', timestamp: new Date().toISOString() });
-  } catch {
-    return res.status(503).json({ status: 'degraded', uptime_s, db: 'down', timestamp: new Date().toISOString() });
+    return res.json({
+      status: 'ok',
+      uptime_s,
+      db: 'ok',
+      storage: USE_SUPABASE ? 'supabase' : 'local',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      node: process.version,
+    });
+  } catch (dbError) {
+    console.error('❌ Health check failed - Database error:', dbError.message);
+    return res.status(503).json({
+      status: 'degraded',
+      uptime_s,
+      db: 'down',
+      storage: USE_SUPABASE ? 'supabase' : 'local',
+      timestamp: new Date().toISOString(),
+    });
   }
 });
 

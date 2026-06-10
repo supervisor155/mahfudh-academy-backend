@@ -179,7 +179,58 @@ module.exports = (io) => {
       _clearSessionChat(io, session_id);
     });
 
-    // SFU signaling relay (offer/answer/ICE)
+    // WebRTC signaling - join live session
+    socket.on('join-live-session', ({ session_id, room_id }) => {
+      if (!session_id) return;
+      socket.join(`session:${session_id}`);
+
+      if (!presence.has(session_id)) presence.set(session_id, new Map());
+      const room = presence.get(session_id);
+
+      // Notify existing participants about new joiner
+      socket.to(`session:${session_id}`).emit('session:participant-joined', {
+        user_id: socket.user.id,
+        socket_id: socket.id,
+        name: socket.user.name,
+        role: socket.user.role,
+      });
+
+      room.set(socket.user.id, {
+        id: socket.user.id,
+        name: socket.user.name,
+        role: socket.user.role,
+        socket_id: socket.id,
+      });
+    });
+
+    // WebRTC offer
+    socket.on('webrtc:offer', ({ to, offer }) => {
+      if (!to || !offer) return;
+      io.to(to).emit('webrtc:offer', {
+        from: socket.id,
+        offer,
+      });
+    });
+
+    // WebRTC answer
+    socket.on('webrtc:answer', ({ to, answer }) => {
+      if (!to || !answer) return;
+      io.to(to).emit('webrtc:answer', {
+        from: socket.id,
+        answer,
+      });
+    });
+
+    // WebRTC ICE candidate
+    socket.on('webrtc:ice-candidate', ({ to, candidate }) => {
+      if (!to || !candidate) return;
+      io.to(to).emit('webrtc:ice-candidate', {
+        from: socket.id,
+        candidate,
+      });
+    });
+
+    // Legacy SFU signaling relay (offer/answer/ICE) - keep for backward compatibility
     socket.on('session:signal', ({ session_id, to_user_id, signal }) => {
       if (!session_id || !to_user_id || !signal) return;
 

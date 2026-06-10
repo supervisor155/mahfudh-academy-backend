@@ -1,6 +1,6 @@
 const reelsService = require('./reels.service');
 const classesService = require('../classes/classes.service');
-const { upload, getPublicUrl } = require('../../utils/storage');
+const { upload, getPublicUrl, uploadToSupabase, USE_SUPABASE } = require('../../utils/storage');
 
 exports.uploadReel = [
   upload.single('file'),
@@ -8,14 +8,29 @@ exports.uploadReel = [
     try {
       const { class_id, title, url: bodyUrl } = req.body;
       if (!class_id) return res.status(400).json({ message: 'class_id required' });
+
       let url = bodyUrl;
-      if (req.file) url = getPublicUrl(req.file.filename, req);
+
+      if (req.file) {
+        if (USE_SUPABASE) {
+          // Upload to Supabase Storage
+          const filename = await uploadToSupabase(req.file);
+          url = getPublicUrl(filename, req);
+        } else {
+          // Local disk storage
+          url = getPublicUrl(req.file.filename, req);
+        }
+      }
+
       if (!url) return res.status(400).json({ message: 'Provide a video file or a url' });
+
       const cls = await classesService.getClassById(class_id);
       if (!cls) return res.status(404).json({ message: 'Class not found' });
+
       const reel = await reelsService.uploadReel({ class_id, title, url, uploaded_by: req.user.id });
       res.status(201).json(reel);
     } catch (err) {
+      console.error('❌ Reel upload error:', err);
       res.status(500).json({ message: err.message });
     }
   },

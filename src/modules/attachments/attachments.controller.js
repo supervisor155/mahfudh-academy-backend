@@ -1,5 +1,5 @@
 const attachmentsService = require('./attachments.service');
-const { upload, getPublicUrl, deleteFile } = require('../../utils/storage');
+const { upload, getPublicUrl, deleteFile, uploadToSupabase, USE_SUPABASE } = require('../../utils/storage');
 
 // POST /api/attachments  (multipart/form-data: file + class_id)
 exports.uploadAttachment = [
@@ -10,17 +10,29 @@ exports.uploadAttachment = [
       const { class_id } = req.body;
       if (!class_id) return res.status(400).json({ message: 'class_id required' });
 
-      const url = getPublicUrl(req.file.filename, req);
+      let filename = req.file.filename;
+      let url;
+
+      if (USE_SUPABASE) {
+        // Upload to Supabase Storage
+        filename = await uploadToSupabase(req.file);
+        url = getPublicUrl(filename, req);
+      } else {
+        // Local disk storage
+        url = getPublicUrl(req.file.filename, req);
+      }
+
       const attachment = await attachmentsService.createAttachment({
         class_id,
         uploaded_by: req.user.id,
-        filename:    req.file.filename,
+        filename,
         url,
         mime_type:   req.file.mimetype,
         size_bytes:  req.file.size,
       });
       res.status(201).json(attachment);
     } catch (err) {
+      console.error('❌ Attachment upload error:', err);
       res.status(500).json({ message: err.message });
     }
   },
