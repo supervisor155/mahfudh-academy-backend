@@ -5,6 +5,20 @@ exports.create = async (req, res) => {
     const { class_id, title, body, pinned } = req.body;
     if (!class_id || !title || !body) return res.status(400).json({ message: 'class_id, title, and body required' });
     const a = await svc.create({ class_id, created_by: req.user.id, title, body, pinned });
+
+    // Emit socket event for real-time notification
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`class:${class_id}`).emit('announcement:new', {
+        id: a.id,
+        title: a.title,
+        content: body,
+        class_id,
+        author: req.user.name,
+        created_at: a.created_at,
+      });
+    }
+
     res.status(201).json(a);
   } catch (err) {
     res.status(500).json({ message: err.message });
